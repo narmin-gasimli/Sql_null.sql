@@ -1,0 +1,56 @@
+WITH a AS (   
+    SELECT 1 Id, 50 number UNION ALL
+    SELECT 2 Id, 65 number UNION ALL
+    SELECT 3 Id, 80 number UNION ALL
+    SELECT 4 Id, NULL number UNION ALL
+    SELECT 5 Id, 110 number UNION ALL
+    SELECT 6 Id, 123 number UNION ALL
+    SELECT 7 Id, NULL number UNION ALL
+    SELECT 8 Id, NULL number UNION ALL
+    SELECT 9 Id, 155 number UNION ALL
+    SELECT 10 Id, 170 number UNION ALL
+    SELECT 11 Id, 176 number UNION ALL
+    SELECT 12 Id, 185 number
+),
+b AS (
+	SELECT Id, number,
+		   CASE WHEN number IS NULL THEN 1 ELSE 0 END AS sütun1,
+		   CASE WHEN number IS NULL THEN 0 ELSE 1 END AS sütun2,
+		   SUM(CASE WHEN number IS NULL THEN 0 ELSE 1 END) OVER (ORDER BY Id) AS sütun3  
+	FROM a
+),
+c AS (
+	SELECT Id, number, sütun1, sütun2, sütun3,
+		COUNT(*) OVER(PARTITION BY sütun3) AS sütun4,
+		ROW_NUMBER() OVER(PARTITION BY sütun3 ORDER BY Id) - sütun1 AS sütun6
+	FROM b
+),
+d AS (  
+	SELECT *,  
+		LAG(sütun6) OVER(ORDER BY Id DESC) AS sütun6A,  
+		LEAD(sütun3) OVER(ORDER BY Id DESC) AS sutun10  
+	FROM c  
+),
+final AS (
+	SELECT  d.*,
+			sütun1 * sütun4 AS sütun5,
+			ISNULL(MAX(number) OVER(PARTITION BY sütun3), 0) * sütun1 AS sütun7,
+			--next.number AS sütun8,
+			ISNULL(MAX(number) OVER(PARTITION BY sutun10), 0) * sütun1 AS sütun9
+	FROM d 
+	--OUTER APPLY (
+	--	SELECT TOP 1 number
+	--	FROM d AS e
+	--	WHERE e.Id > d.Id AND e.number IS NOT NULL
+	--	ORDER BY e.Id
+	--) next
+),
+endof AS (
+	SELECT final.*, 
+		CAST(final.sütun9 - final.sütun7 AS FLOAT) / NULLIF(final.sütun5, 0) AS sütun11
+	FROM final
+)
+SELECT endof.*,  
+       (endof.sütun11 * endof.sütun6A) + endof.sütun7 AS sütun12, 
+       COALESCE(endof.number, (endof.sütun11 * endof.sütun6A) + endof.sütun7) AS sütun13 
+FROM endof;
